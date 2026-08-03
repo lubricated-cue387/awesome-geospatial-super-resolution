@@ -35,6 +35,14 @@ Maintained by [Bilel Khlaifia](https://github.com/khlaifiabilel). Contributions 
   - [General-Purpose SR Frameworks](#general-purpose-sr-frameworks)
   - [Operational / Commercial Products](#operational--commercial-products)
 - [Evaluation & Benchmarking](#evaluation--benchmarking)
+- [Benchmarks & Reported Results](#benchmarks--reported-results)
+  - [Benchmark Suites at a Glance](#benchmark-suites-at-a-glance)
+  - [PROBA-V MISR Results](#proba-v-misr-results)
+  - [Reported Results on Synthetic RS SISR Benchmarks](#reported-results-on-synthetic-rs-sisr-benchmarks)
+  - [Sentinel-2 Band-Sharpening Methods Compared](#sentinel-2-band-sharpening-methods-compared)
+  - [Method-Family Trade-offs](#method-family-trade-offs)
+  - [Metrics Cheat Sheet](#metrics-cheat-sheet)
+  - [Milestone Timeline](#milestone-timeline)
 - [Papers & References](#papers--references)
   - [Surveys & Reviews](#surveys--reviews)
   - [Foundational SISR Papers](#foundational-sisr-papers)
@@ -321,6 +329,164 @@ LR is usually generated synthetically (bicubic or MTF-based downsampling) — fi
 - Never evaluate a GAN/diffusion SR model with PSNR alone — report a perception metric *and* a consistency/hallucination diagnostic.
 - Beware temporal gaps in cross-sensor test pairs: "errors" may be real land-cover change.
 - Check geometric shifts before scoring: sub-pixel misregistration destroys PSNR/SSIM comparability (use shift-tolerant scoring as in the PROBA-V challenge).
+
+---
+
+## Benchmarks & Reported Results
+
+> **A note on numbers.** All figures below are *as reported in the original papers* (or compiled in later comparison tables). Evaluation splits, registration handling, quality masks, and implementations differ subtly between papers — treat gaps smaller than ~0.2 dB as noise, and re-run the official code or [opensr-test](https://github.com/ESAOpenSR/opensr-test) before citing numbers in your own work. Charts are rendered with [Mermaid](https://mermaid.js.org/) directly by GitHub.
+
+### Benchmark Suites at a Glance
+
+| Benchmark | Task | LR → HR | Primary metrics | Where |
+|---|---|---|---|---|
+| **PROBA-V Kelvins** | MISR ×3 | 300 m → 100 m (RED, NIR) | cPSNR, cSSIM | [Kelvins](https://kelvins.esa.int/proba-v-super-resolution/) |
+| **opensr-test** | Sentinel-2 SISR ×4 | S2 → NAIP-like / Venµs | Consistency, Synthesis, Correctness (+ LPIPS...) | [GitHub](https://github.com/ESAOpenSR/opensr-test) |
+| **Sen2Venµs** | Sentinel-2 SISR ×2 / ×4 | S2 10/20 m → Venµs 5 m | RMSE, PSNR, SAM | [DOI](https://doi.org/10.3390/data7070096) |
+| **WorldStrat** | SISR + MISR ×4+ | S2 → SPOT 6/7 (1.5 m) | PSNR, SSIM, LPIPS | [GitHub](https://github.com/worldstrat/worldstrat) |
+| **MuS2** | Sentinel-2 MISR | S2 → WorldView-2 | cPSNR, SSIM, LPIPS | *Scientific Data*, 2023 |
+| **OLI2MSI** | Cross-sensor SISR ×3 | Landsat-8 → S2 | PSNR, SSIM | [GitHub](https://github.com/wjwjww/OLI2MSI) |
+| **UC Merced / AID SR splits** | Synthetic SISR ×2–×4 | Bicubic-degraded aerial scenes | PSNR, SSIM | [UC Merced](http://weegee.vision.ucmerced.edu/datasets/landuse.html) · [AID](https://captain-whu.github.io/AID/) |
+| **Papers With Code** | Various SR leaderboards | — | — | [PWC](https://paperswithcode.com/task/image-super-resolution) |
+
+The three evaluation axes of **opensr-test** (increasingly used as the reference protocol for Sentinel-2 SR):
+
+| Axis | Question it answers | Failure it catches |
+|---|---|---|
+| **Consistency** | Does the SR image stay faithful to the LR input (reflectance, spectra, geometry)? | Radiometric drift, spatial shifts |
+| **Synthesis** | Did the model actually add high-frequency detail? | Blurry "safe" outputs that only interpolate |
+| **Correctness** | Is the added detail real (vs. the true HR reference)? | Hallucinated buildings, invented texture |
+
+### PROBA-V MISR Results
+
+The ESA Kelvins PROBA-V dataset remains the reference benchmark for deep MISR. Metric is **cPSNR** — a PSNR made tolerant to small geometric shifts (±3 px search) and global brightness bias, computed on clear pixels only. Values below are on the community validation split introduced with DeepSUM.
+
+| Method | Year | Type | cPSNR NIR (dB) | cPSNR RED (dB) | Code |
+|---|---|---|---|---|---|
+| Bicubic (best single frame) | — | Interpolation | 45.12 | 47.63 | — |
+| HighRes-net | 2020 | Deep MISR (recursive fusion) | 47.55 | 49.75 | [GitHub](https://github.com/ElementAI/HighRes-net) |
+| DeepSUM | 2020 | Deep MISR (joint registration) | 47.84 | 50.00 | [GitHub](https://github.com/diegovalsesia/deepsum) |
+| RAMS | 2020 | 3D residual attention | 48.23 | 50.17 | [GitHub](https://github.com/EscVM/RAMS) |
+| RAMS+ (self-ensemble) | 2020 | 3D residual attention | 48.51 | 50.44 | [GitHub](https://github.com/EscVM/RAMS) |
+| TR-MISR | 2022 | Transformer fusion | 48.54 | 50.67 | [GitHub](https://github.com/Suanmd/TR-MISR) |
+| PIUnet | 2022 | Permutation-invariant + uncertainty | 48.72 | 50.62 | [GitHub](https://github.com/diegovalsesia/piunet) |
+
+```mermaid
+xychart-beta
+    title "PROBA-V validation, NIR band (cPSNR, higher is better)"
+    x-axis ["Bicubic", "HighRes-net", "DeepSUM", "RAMS", "RAMS+", "TR-MISR", "PIUnet"]
+    y-axis "cPSNR (dB)" 44 --> 50
+    bar [45.12, 47.55, 47.84, 48.23, 48.51, 48.54, 48.72]
+```
+
+```mermaid
+xychart-beta
+    title "PROBA-V validation, RED band (cPSNR, higher is better)"
+    x-axis ["Bicubic", "HighRes-net", "DeepSUM", "RAMS", "RAMS+", "TR-MISR", "PIUnet"]
+    y-axis "cPSNR (dB)" 46 --> 52
+    bar [47.63, 49.75, 50.00, 50.17, 50.44, 50.67, 50.62]
+```
+
+Takeaway: fusing ~9–16 real revisits buys **+3 to +3.6 dB** over single-image interpolation with essentially no hallucination — the physics of sub-pixel sampling is the most trustworthy source of extra resolution.
+
+### Reported Results on Synthetic RS SISR Benchmarks
+
+Approximate ×4 PSNR on **UC Merced** (bicubic degradation), compiled from the TransENet and TTST comparison tables (values rounded, marked `~` on purpose — see disclaimer above):
+
+| Method | Year | Type | PSNR ×4 (dB) |
+|---|---|---|---|
+| SRCNN | 2014 | CNN | ~26.8 |
+| LGCNet | 2017 | CNN (RS-specific) | ~26.9 |
+| DCM | 2019 | CNN (RS-specific) | ~27.2 |
+| HSENet | 2021 | Hybrid attention | ~27.7 |
+| TransENet | 2022 | Transformer | ~27.8 |
+| TTST | 2024 | Selective transformer | ~28.0 |
+
+Two structural caveats: (1) bicubic-degraded benchmarks reward blur-optimal regression and transfer poorly to real sensor degradations; (2) ~1 dB of progress over a decade on this benchmark contrasts with the much larger practical gains from better degradation modeling and real LR–HR pairs (Sen2Venµs, S2-NAIP, WorldStrat).
+
+### Sentinel-2 Band-Sharpening Methods Compared
+
+Qualitative comparison of the main 20 m / 60 m → 10 m methods (no single agreed numeric benchmark exists; DSen2 and S2Sharp papers each report reduced-resolution RMSE/SRE comparisons on Wald-protocol data):
+
+| Method | Type | 20→10 m | 60→10 m | Training needed | Speed | Code |
+|---|---|---|---|---|---|---|
+| ATPRK | Geostatistical (kriging) | Yes | Not typical | No | Fast | Limited |
+| Sen2Res | Per-image geometric model | Yes | Yes | No (per-image optimization) | Slow | [SNAP plugin](https://nicolas.brodu.net/recherche/superres/) |
+| SupReME | Variational subspace | Yes | Yes | No | Medium | [GitHub](https://github.com/lanha/SupReME) |
+| S2Sharp | Variational reduced-rank | Yes | Yes | No | Medium | MATLAB |
+| DSen2 | CNN (Wald protocol) | Yes | Yes | Pre-trained, globally applicable | Fast (GPU) | [GitHub](https://github.com/lanha/DSen2) |
+
+Reported ordering in the DSen2 and S2Sharp papers is consistent: **DSen2 ≥ S2Sharp ≈ SupReME > Sen2Res > ATPRK > duplication/bicubic** on reduced-resolution RMSE — with the usual caveat that CNN advantages shrink out-of-distribution (unseen biomes/seasons).
+
+### Method-Family Trade-offs
+
+| Family | Examples | Pixel fidelity | Perceptual sharpness | Hallucination risk | Uncertainty output | Cost |
+|---|---|---|---|---|---|---|
+| Interpolation | Bicubic, Lanczos | Baseline | Very low | None | — | Negligible |
+| Variational / model-based | SupReME, S2Sharp | High (within sensor) | Low–medium | Very low | Partial | CPU, minutes |
+| Regression CNN (L1/L2) | EDSR, RCAN, DSen2, CARN | Highest on-distribution | Medium | Low–medium | No | GPU, ms–s |
+| GAN / perceptual | ESRGAN, Satlas SR, sr4rs | Lower | High | **High** | No | GPU, ms–s |
+| Transformer (L1) | SwinIR, HAT, TTST | Highest | Medium | Low–medium | No | GPU, heavier |
+| Diffusion | SR3, EDiffSR, LDSR-S2 | Medium | High | Medium (measurable via sampling) | **Yes** (sample spread) | GPU, multi-step |
+| Implicit / arbitrary-scale | LIIF, FunSR | Medium–high | Medium | Low–medium | No | Flexible |
+| Deep MISR | HighRes-net → PIUnet | High (real sub-pixel info) | Medium–high | **Lowest** of learned methods | PIUnet: yes | Needs revisits |
+
+```mermaid
+quadrantChart
+    title Perception vs fidelity landscape of SR families - conceptual
+    x-axis Low fidelity to LR input --> High fidelity to LR input
+    y-axis Low perceptual sharpness --> High perceptual sharpness
+    quadrant-1 Goal - sharp and trustworthy
+    quadrant-2 Hallucination risk zone
+    quadrant-3 Avoid
+    quadrant-4 Safe but soft
+    Bicubic: [0.80, 0.10]
+    Variational model-based: [0.85, 0.35]
+    Regression CNN: [0.85, 0.45]
+    Deep MISR fusion: [0.90, 0.62]
+    GAN perceptual: [0.45, 0.90]
+    Diffusion: [0.60, 0.85]
+    Constrained diffusion: [0.75, 0.80]
+```
+
+### Metrics Cheat Sheet
+
+| Metric | Type | Measures | Better | Watch out |
+|---|---|---|---|---|
+| PSNR | Full-reference | Pixel-wise error | Higher | Rewards blur; misregistration-sensitive |
+| cPSNR | Full-reference | Shift/bias-tolerant PSNR | Higher | PROBA-V protocol; ±3 px search |
+| SSIM / MS-SSIM | Full-reference | Structural similarity | Higher | Same blur bias, milder |
+| LPIPS | Learned perceptual | Deep-feature distance | Lower | Trained on natural RGB, not multispectral |
+| DISTS | Learned perceptual | Structure + texture | Lower | Same domain caveat |
+| SAM | Spectral | Angle between spectral vectors | Lower | Blind to global intensity scaling |
+| ERGAS | Spectral-radiometric | Normalized band-wise RMSE | Lower | Scale-factor dependent |
+| SCC | Spatial | Correlation of high-pass detail | Higher | Needs good co-registration |
+| Q4 / Q2n | Full-reference (MS) | Hypercomplex quality index | Higher | Pansharpening standard |
+| QNR (Dλ, Ds) | No-reference | Spectral + spatial distortion | QNR higher; Dλ, Ds lower | Full-resolution pansharpening protocol |
+| NIQE / BRISQUE | No-reference | Natural-image statistics | Lower | Not calibrated for EO imagery |
+| FID / KID | Distributional | Realism of an output *set* | Lower | Says nothing about a single image; hallucination-blind |
+| Task metrics (mAP, IoU...) | Downstream | Real utility of SR | Higher | The final arbiter for applications |
+
+### Milestone Timeline
+
+```mermaid
+timeline
+    title Milestones in geospatial super-resolution
+    1984 : Tsai and Huang formalize multi-frame SR
+    1991 : Iterative back-projection - Irani and Peleg
+    2010 : Sparse-coding SR - Yang et al.
+    2014 : SRCNN brings deep learning to SISR
+    2016 : PNN - first deep pansharpening : Sen2Res and SupReME sharpen Sentinel-2 bands
+    2017 : SRGAN and EDSR set the SISR agenda
+    2018 : DSen2 - global CNN for Sentinel-2 band sharpening : ESRGAN
+    2019 : ESA Kelvins PROBA-V challenge popularizes deep MISR
+    2020 : HighRes-net, DeepSUM, RAMS : MISR state of the art forms
+    2021 : SwinIR transformers : SR3 diffusion SR
+    2022 : Sen2Venus and WorldStrat real-pair datasets : PIUnet and TR-MISR
+    2023 : L1BSR self-supervised S2 SR : EDiffSR : MuS2 benchmark
+    2024 : opensr-test trustworthiness benchmark : TTST
+    2025 : LDSR-S2 latent diffusion with uncertainty for Sentinel-2
+```
 
 ---
 
